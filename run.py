@@ -1,7 +1,8 @@
 import pycatastro
 from pyproj import Proj, transform
-import pandas
+import pandas as pd
 import json
+import collections
 
 # This invokes the wrapper
 cat = pycatastro.PyCatastro
@@ -9,16 +10,24 @@ cat = pycatastro.PyCatastro
 # File to load
 file_name = input("What's the name of the CSV file to load?: ")
 # Load the file onto a Pandas DataFrame
-df = pandas.read_csv(file_name)
+df = pd.read_csv(file_name)
+
+# Obtain the actual strings for provinces
+# dic_prov = pd.DataFrame(provincias['consulta_provinciero']['provinciero']['prov'])
+# dic_prov.to_csv('diccionario_provincias.csv')
 
 # Apply class method 'catastro' via lambda function
-df['result'] = df.apply(lambda x: cat.Consulta_CPMRC(0,0,0,x['RC']),axis=1)
+df['result'] = df.apply(lambda x: cat.Consulta_CPMRC(x['PROVINCIA_OK'],'','', x['RC14']), axis=1)
+
+# Declare the output geotag codes
+outProj = Proj(init='epsg:4326')
+
+df['longitude'] = df.apply(lambda row: row['result']['consulta_coordenadas']['coordenadas']['coord']['geo']['xcen'], axis=1)
+df['latitude'] = df.apply(lambda row: row['result']['consulta_coordenadas']['coordenadas']['coord']['geo']['ycen'], axis=1)
+df['epsg'] = df.apply(lambda row: row['result']['consulta_coordenadas']['coordenadas']['coord']['geo']['srs'], axis=1)
+df['gmaps'] = df.apply(lambda t: transform(t['epsg'],outProj,t['longitude'],t['latitude']), axis=1)
+df['dir_cat'] = df.apply(lambda row: row['result']['consulta_coordenadas']['coordenadas']['coord']['ldt'], axis=1)
 print(df)
 
-#x_coord = latlong['consulta_coordenadas']['coordenadas']['coord']['geo']['xcen']
-#y_coord = latlong['consulta_coordenadas']['coordenadas']['coord']['geo']['ycen']
-
-#inProj = Proj(init='epsg:25830')
-#outProj = Proj(init='epsg:4326')
-#x2,y2 = transform(inProj,outProj,x_coord,y_coord)
-#print(y2,x2)
+# Export results to CSV
+df.to_csv('export.csv')
